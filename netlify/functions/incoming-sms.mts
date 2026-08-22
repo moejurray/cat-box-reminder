@@ -5,6 +5,7 @@ import {
   addHours,
   db,
   displayNameForPhone,
+  normalizePhone,
   recipients,
   REMINDER_HOURS
 } from "./_lib.mts";
@@ -41,20 +42,22 @@ export default async (req: Request) => {
       return new Response("Forbidden", { status: 403 });
     }
 
-    const from = params.From ?? "";
+    const from = normalizePhone(params.From ?? "");
     const body = params.Body ?? "";
+    const recognizedSender = recipients().includes(from);
+    const confirmationAccepted = acceptedConfirmation(body);
 
     console.log("incoming-sms: validated", {
-      recognizedSender: recipients().includes(from),
-      acceptedConfirmation: acceptedConfirmation(body)
+      recognizedSender,
+      acceptedConfirmation: confirmationAccepted
     });
 
-    if (!recipients().includes(from)) {
-      return new Response("", { status: 204 });
+    if (!recognizedSender) {
+      return new Response(null, { status: 204 });
     }
 
-    if (!acceptedConfirmation(body)) {
-      return new Response("", { status: 204 });
+    if (!confirmationAccepted) {
+      return new Response(null, { status: 204 });
     }
 
     const now = new Date();
@@ -78,7 +81,7 @@ export default async (req: Request) => {
     `;
 
     console.log("incoming-sms: timer reset", { who });
-    return new Response("", { status: 204 });
+    return new Response(null, { status: 204 });
   } catch (error) {
     console.error("incoming-sms: unhandled error", error);
     return new Response("Internal Server Error", { status: 500 });
