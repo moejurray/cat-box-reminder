@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cat Box Reminder</title></head>
+<body>
+<main>
+<h1>Cat Box Reminder</h1>
+<p>Cleaning resets one shared 36-hour timer for the household.</p>
+<div id="status">Loading status…</div>
+<label for="pin">Household PIN</label>
+<input id="pin" type="password" inputmode="numeric">
+<button id="cleaned">Cat Box Cleaned Now</button>
+<p id="message"></p>
+<p>Reminder texts are sent only from 8:00 AM through 7:59 PM Pacific. Reply DONE, CLEANED, YES, FINISHED, or COMPLETE to reset the timer.</p>
+</main>
+<script>
+const statusEl=document.getElementById('status');
+const messageEl=document.getElementById('message');
+const pinEl=document.getElementById('pin');
+const button=document.getElementById('cleaned');
+function fmt(v){return v?new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(new Date(v)):'Not set'}
+async function loadStatus(){const r=await fetch('/api/status');const s=await r.json();statusEl.innerHTML=`<strong>Last cleaned:</strong> ${fmt(s.last_cleaned_at)}<br><strong>Next due:</strong> ${fmt(s.next_due_at)}<br><strong>Waiting for reply:</strong> ${s.waiting_for_reply?'Yes':'No'}`}
+button.addEventListener('click',async()=>{button.disabled=true;messageEl.textContent='';const r=await fetch('/api/cleaned-now',{method:'POST',headers:{'x-household-pin':pinEl.value}});const data=await r.json().catch(()=>({}));if(!r.ok)messageEl.textContent=data.error||'Could not reset timer.';else{messageEl.textContent='Timer reset for 36 hours.';await loadStatus()}button.disabled=false});
+loadStatus().catch(()=>{statusEl.textContent='Status unavailable.'});
+</script>
+</body>
+</html>
