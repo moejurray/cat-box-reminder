@@ -55,4 +55,5 @@ export default async () => {
   }
 };
 
-export const config: Config = { schedule: "*/5 * * * *" };
+// TEMPORARY TEST MODE: check every minute. Restore to */5 after validation.
+export const config: Config = { schedule: "* * * * *" };
