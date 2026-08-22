@@ -26,18 +26,28 @@ export function insideSendWindow(date = new Date()): boolean {
   return hour >= 8 && hour < 20;
 }
 
+export function normalizePhone(phone: string | undefined): string {
+  if (!phone) return "";
+  let digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) digits = `1${digits}`;
+  return digits ? `+${digits}` : "";
+}
+
 export function recipients(): string[] {
   return [
     Netlify.env.get("USER_PHONE"),
     Netlify.env.get("WIFE_PHONE"),
     Netlify.env.get("DAUGHTER_PHONE")
-  ].filter((v): v is string => Boolean(v));
+  ]
+    .map((v) => normalizePhone(v))
+    .filter(Boolean);
 }
 
 export function displayNameForPhone(phone: string): string {
-  if (phone === Netlify.env.get("USER_PHONE")) return "user";
-  if (phone === Netlify.env.get("WIFE_PHONE")) return "wife";
-  if (phone === Netlify.env.get("DAUGHTER_PHONE")) return "daughter";
+  const normalized = normalizePhone(phone);
+  if (normalized === normalizePhone(Netlify.env.get("USER_PHONE"))) return "user";
+  if (normalized === normalizePhone(Netlify.env.get("WIFE_PHONE"))) return "wife";
+  if (normalized === normalizePhone(Netlify.env.get("DAUGHTER_PHONE"))) return "daughter";
   return "unknown";
 }
 
@@ -49,7 +59,7 @@ export function twilioClient() {
 }
 
 export function twilioNumber(): string {
-  const value = Netlify.env.get("TWILIO_PHONE_NUMBER");
+  const value = normalizePhone(Netlify.env.get("TWILIO_PHONE_NUMBER"));
   if (!value) throw new Error("TWILIO_PHONE_NUMBER is not configured");
   return value;
 }
