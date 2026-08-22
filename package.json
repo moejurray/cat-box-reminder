@@ -1,0 +1,19 @@
+{
+  "name": "cat-box-reminder",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo 'Static site: no build step'"
+  },
+  "dependencies": {
+    "@netlify/database": "latest",
+    "@netlify/functions": "latest",
+    "twilio": "latest"
+  },
+  "devDependencies": {
+    "netlify-cli": "latest",
+    "typescript": "latest"
+  }
+}
