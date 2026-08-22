@@ -2,7 +2,8 @@ import { getDatabase } from "@netlify/database";
 import twilio from "twilio";
 
 export const PACIFIC_TZ = "America/Los_Angeles";
-export const REMINDER_HOURS = 36;
+// TEMPORARY TEST MODE: 2 minutes. Restore to 36 after outbound SMS validation.
+export const REMINDER_HOURS = 2 / 60;
 
 export function db() {
   return getDatabase();
