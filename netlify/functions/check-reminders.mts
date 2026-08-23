@@ -80,6 +80,12 @@ function nextEscalationAt(now: Date): Date {
   return pacificLocalDate(tomorrow.year, tomorrow.month, tomorrow.day, 8, 0);
 }
 
+function twilioErrorCode(err: unknown): number | undefined {
+  if (typeof err !== "object" || err === null || !("code" in err)) return undefined;
+  const value = (err as { code?: unknown }).code;
+  return typeof value === "number" ? value : Number(value);
+}
+
 export default async () => {
   const now = new Date();
   if (!insideSendWindow(now)) return;
@@ -145,7 +151,8 @@ export default async () => {
       WHERE id = 1
     `;
   } catch (err) {
-    const retryAt = addHours(now, 1);
+    const retryHours = twilioErrorCode(err) === 63038 ? 24 : 1;
+    const retryAt = addHours(now, retryHours);
     await database.sql`
       UPDATE cat_box_state
       SET waiting_for_reply = FALSE,
@@ -153,6 +160,11 @@ export default async () => {
           updated_at = NOW()
       WHERE id = 1
     `;
+    console.error("check-reminders: outbound send failed", {
+      twilioCode: twilioErrorCode(err),
+      retryHours,
+      retryAt: retryAt.toISOString()
+    });
     throw err;
   }
 };
