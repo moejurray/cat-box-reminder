@@ -21,7 +21,8 @@ A Netlify + Twilio household reminder app. One shared cat-box timer is reset whe
 - The **Cat Box Cleaned Now** web button does the same reset and is protected by `HOUSEHOLD_PIN`.
 - Twilio webhook signatures are validated against the public inbound webhook URL.
 - Phone numbers are normalized before comparison so common formatting differences do not break sender recognition.
-- If an outbound reminder attempt fails, the app clears the waiting state and backs off for one hour before another attempt.
+- If an outbound reminder attempt fails for a normal transient reason, the app clears the waiting state and backs off for one hour before another attempt.
+- If Twilio returns error `63038` for the account's rolling 50-message daily limit, the app backs off for 24 hours so the 15-minute scheduler does not repeatedly hit Twilio while the account is still capped.
 
 ## Verified so far
 
@@ -29,7 +30,7 @@ A Netlify + Twilio household reminder app. One shared cat-box timer is reset whe
 - Configured household sender recognition works.
 - Confirmation words such as `DONE` reset the shared timer successfully.
 - The scheduled reminder function reaches Twilio's Messaging API.
-- Full outbound delivery to all three recipients is still pending a clean test after the Twilio account daily-message limit resets.
+- Full outbound delivery to all three recipients is still pending a clean test after the Twilio account rolling daily-message limit clears.
 
 ## Required environment variables
 
