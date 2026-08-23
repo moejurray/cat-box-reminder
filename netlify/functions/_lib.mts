@@ -23,7 +23,7 @@ export function pacificHour(date = new Date()): number {
 
 export function insideSendWindow(date = new Date()): boolean {
   const hour = pacificHour(date);
-  return hour >= 8 && hour < 20;
+  return hour >= 8 && hour < 21;
 }
 
 export function normalizePhone(phone: string | undefined): string {
