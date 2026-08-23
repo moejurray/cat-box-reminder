@@ -1,5 +1,5 @@
 import type { Config } from "@netlify/functions";
-import { db, insideSendWindow, recipients, twilioClient, twilioNumber } from "./_lib.mts";
+import { addHours, db, insideSendWindow, recipients, twilioClient, twilioNumber } from "./_lib.mts";
 
 export default async () => {
   const now = new Date();
@@ -33,7 +33,14 @@ export default async () => {
   const from = twilioNumber();
   const people = recipients();
   if (people.length !== 3) {
-    await database.sql`UPDATE cat_box_state SET waiting_for_reply = FALSE WHERE id = 1`;
+    const retryAt = addHours(now, 1);
+    await database.sql`
+      UPDATE cat_box_state
+      SET waiting_for_reply = FALSE,
+          next_due_at = ${retryAt},
+          updated_at = NOW()
+      WHERE id = 1
+    `;
     throw new Error("All three recipient phone numbers must be configured");
   }
 
@@ -50,10 +57,16 @@ export default async () => {
       `;
     }
   } catch (err) {
-    await database.sql`UPDATE cat_box_state SET waiting_for_reply = FALSE WHERE id = 1`;
+    const retryAt = addHours(now, 1);
+    await database.sql`
+      UPDATE cat_box_state
+      SET waiting_for_reply = FALSE,
+          next_due_at = ${retryAt},
+          updated_at = NOW()
+      WHERE id = 1
+    `;
     throw err;
   }
 };
 
-// TEMPORARY TEST MODE: check every minute. Restore to */5 after validation.
-export const config: Config = { schedule: "* * * * *" };
+export const config: Config = { schedule: "*/5 * * * *" };
