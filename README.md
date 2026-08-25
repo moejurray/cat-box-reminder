@@ -22,7 +22,7 @@ A Netlify + Twilio household reminder app. One shared cat-box timer is reset whe
 - Twilio webhook signatures are validated against the public inbound webhook URL.
 - Phone numbers are normalized before comparison so common formatting differences do not break sender recognition.
 - If an outbound reminder attempt fails for a normal transient reason, the app clears the waiting state and backs off for one hour before another attempt.
-- If Twilio returns error `63038` for the account's rolling 50-message daily limit, the app backs off for 24 hours so the 15-minute scheduler does not repeatedly hit Twilio while the account is still capped.
+- If Twilio returns error `63038` for the account's rolling message limit, the app backs off for 24 hours so the scheduler does not repeatedly hit Twilio while the account is still capped.
 
 ## Verified so far
 
@@ -30,13 +30,19 @@ A Netlify + Twilio household reminder app. One shared cat-box timer is reset whe
 - Configured household sender recognition works.
 - Confirmation words such as `DONE` reset the shared timer successfully.
 - The scheduled reminder function reaches Twilio's Messaging API.
-- Full outbound delivery to all three recipients is still pending a clean test after the Twilio account rolling daily-message limit clears.
+- A controlled outbound test on 2026-08-24 reached Twilio but was blocked with error `21608`: trial accounts may send SMS only to verified recipient phone numbers.
+- Full outbound delivery to all three recipients is still pending verification of the household destination numbers in Twilio or upgrading the Twilio account.
+- After testing, the app was restored to the 36-hour timer and 15-minute production scheduler.
 
 ## Required environment variables
 
 `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `USER_PHONE`, `WIFE_PHONE`, `DAUGHTER_PHONE`, and `HOUSEHOLD_PIN`.
 
 All phone numbers should be entered in E.164 format, for example `+14155551212`. For inbound sender matching, use the actual carrier number Twilio receives in the `From` field.
+
+## Twilio trial-account note
+
+Twilio trial accounts can send SMS only to recipient phone numbers that have been verified in the Twilio Console. For a three-person household test, verify all three destination phone numbers or upgrade the Twilio account before retrying outbound delivery.
 
 ## Twilio inbound webhook
 
