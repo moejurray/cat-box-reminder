@@ -30,8 +30,9 @@ A Netlify + Twilio household reminder app. One shared cat-box timer is reset whe
 - Configured household sender recognition works.
 - Confirmation words such as `DONE` reset the shared timer successfully.
 - The scheduled reminder function reaches Twilio's Messaging API.
-- A controlled outbound test on 2026-08-24 reached Twilio but was blocked with error `21608`: trial accounts may send SMS only to verified recipient phone numbers.
-- Full outbound delivery to all three recipients is still pending verification of the household destination numbers in Twilio or upgrading the Twilio account.
+- A controlled outbound test on 2026-08-24 first reached Twilio but was blocked with error `21608` because the account was in Trial Mode and destination numbers were not yet verified.
+- After recipient verification, all three outbound attempts reached Twilio but were blocked with error `30032`: the Toll-Free number itself is not yet fully verified for US/Canada messaging.
+- Full outbound delivery to all three recipients is therefore pending Twilio Toll-Free Verification approval.
 - After testing, the app was restored to the 36-hour timer and 15-minute production scheduler.
 
 ## Required environment variables
@@ -40,9 +41,11 @@ A Netlify + Twilio household reminder app. One shared cat-box timer is reset whe
 
 All phone numbers should be entered in E.164 format, for example `+14155551212`. For inbound sender matching, use the actual carrier number Twilio receives in the `From` field.
 
-## Twilio trial-account note
+## Twilio account and Toll-Free verification notes
 
-Twilio trial accounts can send SMS only to recipient phone numbers that have been verified in the Twilio Console. For a three-person household test, verify all three destination phone numbers or upgrade the Twilio account before retrying outbound delivery.
+Twilio trial accounts can send SMS only to recipient phone numbers that have been verified in the Twilio Console. Separately, US/Canada outbound SMS from a Toll-Free number is blocked until the Toll-Free Verification submission is fully approved. Error `30032` indicates the Toll-Free number is still unverified, pending, restricted, or otherwise not approved for messaging.
+
+To check Toll-Free Verification status in Twilio Console, open **Phone Numbers → Manage → Active numbers**, select the Toll-Free number, then open **Regulatory Information**.
 
 ## Twilio inbound webhook
 
