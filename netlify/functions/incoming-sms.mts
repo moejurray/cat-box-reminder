@@ -2,11 +2,10 @@ import type { Config } from "@netlify/functions";
 import twilio from "twilio";
 import {
   acceptedConfirmation,
+  activeMemberForPhone,
   addHours,
   db,
-  displayNameForPhone,
   normalizePhone,
-  recipients,
   REMINDER_HOURS
 } from "./_lib.mts";
 
@@ -16,9 +15,7 @@ export default async (req: Request) => {
   try {
     console.log("incoming-sms: request received", { method: req.method });
 
-    if (req.method !== "POST") {
-      return new Response("Method Not Allowed", { status: 405 });
-    }
+    if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
 
     const authToken = Netlify.env.get("TWILIO_AUTH_TOKEN");
     if (!authToken) {
@@ -29,13 +26,7 @@ export default async (req: Request) => {
     const rawBody = await req.text();
     const params = Object.fromEntries(new URLSearchParams(rawBody).entries());
     const signature = req.headers.get("x-twilio-signature") ?? "";
-
-    const valid = twilio.validateRequest(
-      authToken,
-      signature,
-      PUBLIC_WEBHOOK_URL,
-      params
-    );
+    const valid = twilio.validateRequest(authToken, signature, PUBLIC_WEBHOOK_URL, params);
 
     if (!valid) {
       console.warn("incoming-sms: invalid Twilio signature");
@@ -43,44 +34,47 @@ export default async (req: Request) => {
     }
 
     const from = normalizePhone(params.From ?? "");
-    const body = params.Body ?? "";
-    const recognizedSender = recipients().includes(from);
-    const confirmationAccepted = acceptedConfirmation(body);
+    const body = (params.Body ?? "").trim();
+    const database = db();
 
+    if (/^stop$/i.test(body)) {
+      await database.sql`
+        UPDATE household_members
+        SET active = FALSE, opted_out_at = NOW(), updated_at = NOW()
+        WHERE phone = ${from}
+      `;
+      console.log("incoming-sms: member opted out");
+      return new Response(null, { status: 204 });
+    }
+
+    const member = await activeMemberForPhone(from);
+    const confirmationAccepted = acceptedConfirmation(body);
     console.log("incoming-sms: validated", {
-      recognizedSender,
+      recognizedSender: Boolean(member),
       acceptedConfirmation: confirmationAccepted
     });
 
-    if (!recognizedSender) {
-      return new Response(null, { status: 204 });
-    }
-
-    if (!confirmationAccepted) {
-      return new Response(null, { status: 204 });
-    }
+    if (!member || !confirmationAccepted) return new Response(null, { status: 204 });
 
     const now = new Date();
     const nextDue = addHours(now, REMINDER_HOURS);
-    const who = displayNameForPhone(from);
-    const database = db();
 
     await database.sql`
       UPDATE cat_box_state
       SET last_cleaned_at = ${now},
           next_due_at = ${nextDue},
           waiting_for_reply = FALSE,
-          last_confirmed_by = ${who},
+          last_confirmed_by = ${member.name},
           updated_at = NOW()
       WHERE id = 1
     `;
 
     await database.sql`
       INSERT INTO cleaning_events (cleaned_at, confirmed_by, source)
-      VALUES (${now}, ${who}, ${"sms"})
+      VALUES (${now}, ${member.name}, ${"sms"})
     `;
 
-    console.log("incoming-sms: timer reset", { who });
+    console.log("incoming-sms: timer reset", { who: member.name });
     return new Response(null, { status: 204 });
   } catch (error) {
     console.error("incoming-sms: unhandled error", error);
