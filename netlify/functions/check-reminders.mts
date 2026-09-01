@@ -1,5 +1,5 @@
 import type { Config } from "@netlify/functions";
-import { addHours, db, insideSendWindow, PACIFIC_TZ, recipients, twilioClient, twilioNumber } from "./_lib.mts";
+import { activeRecipients, addHours, db, insideSendWindow, PACIFIC_TZ, twilioClient, twilioNumber } from "./_lib.mts";
 
 type PacificParts = {
   year: number;
@@ -57,23 +57,13 @@ function addPacificDays(parts: PacificParts, days: number): PacificParts {
 function nextEscalationAt(now: Date): Date {
   const p = pacificParts(now);
 
-  if (p.hour < 8) {
-    return pacificLocalDate(p.year, p.month, p.day, 8, 0);
-  }
-
-  if (p.hour < 17) {
-    return pacificLocalDate(p.year, p.month, p.day, 17, 0);
-  }
-
-  if (p.hour < 20) {
-    return pacificLocalDate(p.year, p.month, p.day, p.hour + 1, 0);
-  }
+  if (p.hour < 8) return pacificLocalDate(p.year, p.month, p.day, 8, 0);
+  if (p.hour < 17) return pacificLocalDate(p.year, p.month, p.day, 17, 0);
+  if (p.hour < 20) return pacificLocalDate(p.year, p.month, p.day, p.hour + 1, 0);
 
   if (p.hour === 20) {
     const nextQuarter = (Math.floor(p.minute / 15) + 1) * 15;
-    if (nextQuarter < 60) {
-      return pacificLocalDate(p.year, p.month, p.day, 20, nextQuarter);
-    }
+    if (nextQuarter < 60) return pacificLocalDate(p.year, p.month, p.day, 20, nextQuarter);
   }
 
   const tomorrow = addPacificDays(p, 1);
@@ -102,6 +92,12 @@ export default async () => {
   const due = new Date(state.next_due_at);
   if (due.getTime() > now.getTime()) return;
 
+  const people = await activeRecipients();
+  if (people.length === 0) {
+    console.log("check-reminders: no opted-in household members; skipping send");
+    return;
+  }
+
   const claimed = await database.sql`
     UPDATE cat_box_state
     SET waiting_for_reply = TRUE,
@@ -116,18 +112,6 @@ export default async () => {
 
   const client = twilioClient();
   const from = twilioNumber();
-  const people = recipients();
-  if (people.length !== 3) {
-    const retryAt = addHours(now, 1);
-    await database.sql`
-      UPDATE cat_box_state
-      SET waiting_for_reply = FALSE,
-          next_due_at = ${retryAt},
-          updated_at = NOW()
-      WHERE id = 1
-    `;
-    throw new Error("All three recipient phone numbers must be configured");
-  }
 
   try {
     for (const to of people) {
