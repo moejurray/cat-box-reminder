@@ -21,7 +21,7 @@ The home page links to `/members.html`, which is protected by the household PIN.
 
 1. Enter a household member's name and mobile number.
 2. The app creates a unique private opt-in URL and stores the member as **Pending opt-in**.
-3. **Text invite** opens the device's own SMS app with the invitation prefilled. The Cat Box Reminder Twilio number intentionally does not send this invitation because the recipient has not consented yet.
+3. **Text invite** opens the device's own SMS app with the invitation prefilled. **Copy link** copies the private opt-in URL so it can be shared another way. The Cat Box Reminder Twilio number intentionally does not send this invitation because the recipient has not consented yet.
 4. The recipient opens the private link at `/sms-consent.html?t=...`, reviews the SMS disclosure, checks the consent box, and submits it.
 5. The database records the consent timestamp, disclosure text, source, and user agent, and marks the member active.
 6. Only active, consented members receive reminder SMS messages or can reset the timer by replying with a confirmation word.
