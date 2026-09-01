@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cat Box Reminder — Household Members</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:40px auto;padding:0 18px;line-height:1.45;color:#222}input,button{font:inherit;padding:10px;margin:4px 0}input{width:100%;box-sizing:border-box}button{cursor:pointer}.card{border:1px solid #ddd;border-radius:10px;padding:16px;margin:16px 0}.muted{color:#666}.status{font-weight:600}.good{color:#176b2c}.pending{color:#8a5a00}.bad{color:#9b1c1c}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:520px){.row{grid-template-columns:1fr}}a{color:inherit}
+</style>
+</head>
+<body>
+<main>
+<h1>Household Members</h1>
+<p>Add a person here first. The app creates a private opt-in link. Use <strong>Text invite</strong> to open your own messaging app with the invitation prefilled; the Cat Box Reminder Twilio number does not text someone until that person has opted in.</p>
+<div class="card">
+<label for="pin">Household PIN</label>
+<input id="pin" type="password" inputmode="numeric" autocomplete="current-password">
+<button id="load">Load members</button>
+</div>
+<div id="list"></div>
+<div class="card">
+<h2>Add household member</h2>
+<div class="row"><div><label for="name">Name</label><input id="name" autocomplete="name"></div><div><label for="phone">Mobile number</label><input id="phone" type="tel" autocomplete="tel" placeholder="(415) 555-1212"></div></div>
+<button id="add">Create opt-in invitation</button>
+<p id="msg" aria-live="polite"></p>
+<div id="invite" hidden>
+<p><strong>Invitation ready.</strong></p>
+<p><a id="inviteLink" href="#"></a></p>
+<p><a id="textInvite" href="#">Text invite</a></p>
+</div>
+</div>
+<p><a href="/">← Back to Cat Box Reminder</a></p>
+</main>
+<script>
+const $=id=>document.getElementById(id);const list=$('list'),msg=$('msg'),invite=$('invite');
+function pin(){return $('pin').value}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function status(m){if(m.active&&m.consented_at)return '<span class="status good">Opted in</span>';if(m.opted_out_at)return '<span class="status bad">Opted out</span>';return '<span class="status pending">Pending opt-in</span>'}
+async function load(){list.textContent='Loading…';const r=await fetch('/api/members',{headers:{'x-household-pin':pin()}});const d=await r.json().catch(()=>({}));if(!r.ok){list.textContent=d.error||'Could not load members.';return}if(!d.members.length){list.innerHTML='<p class="muted">No household members have been added yet.</p>';return}list.innerHTML=d.members.map(m=>`<div class="card"><strong>${esc(m.name)}</strong><br>${esc(m.phone)}<br>${status(m)}${m.consented_at?`<br><span class="muted">Consented ${new Date(m.consented_at).toLocaleString()}</span>`:''}</div>`).join('')}
+$('load').addEventListener('click',load);
+$('add').addEventListener('click',async()=>{msg.textContent='';invite.hidden=true;const r=await fetch('/api/members',{method:'POST',headers:{'content-type':'application/json','x-household-pin':pin()},body:JSON.stringify({name:$('name').value,phone:$('phone').value})});const d=await r.json().catch(()=>({}));if(!r.ok){msg.textContent=d.error||'Could not create invitation.';return}const url=d.invite_url;$('inviteLink').href=url;$('inviteLink').textContent=url;const body=`Hi ${d.member.name} — please opt in to our household Cat Box Reminder texts here: ${url}`;$('textInvite').href=`sms:${d.member.phone}?&body=${encodeURIComponent(body)}`;invite.hidden=false;msg.textContent='Invitation created. Send the link to the person and wait for them to opt in.';await load()});
+</script>
+</body>
+</html>
