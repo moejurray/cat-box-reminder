@@ -33,22 +33,45 @@ export function normalizePhone(phone: string | undefined): string {
   return digits ? `+${digits}` : "";
 }
 
-export function recipients(): string[] {
-  return [
-    Netlify.env.get("USER_PHONE"),
-    Netlify.env.get("WIFE_PHONE"),
-    Netlify.env.get("DAUGHTER_PHONE")
-  ]
-    .map((v) => normalizePhone(v))
-    .filter(Boolean);
+export type HouseholdMember = {
+  id: number;
+  name: string;
+  phone: string;
+};
+
+export async function activeMembers(): Promise<HouseholdMember[]> {
+  const database = db();
+  const rows = await database.sql`
+    SELECT id, name, phone
+    FROM household_members
+    WHERE active = TRUE
+      AND consented_at IS NOT NULL
+      AND opted_out_at IS NULL
+    ORDER BY created_at ASC
+  `;
+  return rows.map((row: any) => ({ id: Number(row.id), name: String(row.name), phone: normalizePhone(String(row.phone)) }));
 }
 
-export function displayNameForPhone(phone: string): string {
+export async function activeRecipients(): Promise<string[]> {
+  return (await activeMembers()).map((member) => member.phone).filter(Boolean);
+}
+
+export async function activeMemberForPhone(phone: string): Promise<HouseholdMember | null> {
   const normalized = normalizePhone(phone);
-  if (normalized === normalizePhone(Netlify.env.get("USER_PHONE"))) return "user";
-  if (normalized === normalizePhone(Netlify.env.get("WIFE_PHONE"))) return "wife";
-  if (normalized === normalizePhone(Netlify.env.get("DAUGHTER_PHONE"))) return "daughter";
-  return "unknown";
+  if (!normalized) return null;
+  const database = db();
+  const rows = await database.sql`
+    SELECT id, name, phone
+    FROM household_members
+    WHERE phone = ${normalized}
+      AND active = TRUE
+      AND consented_at IS NOT NULL
+      AND opted_out_at IS NULL
+    LIMIT 1
+  `;
+  if (!rows[0]) return null;
+  const row = rows[0] as any;
+  return { id: Number(row.id), name: String(row.name), phone: normalizePhone(String(row.phone)) };
 }
 
 export function twilioClient() {
