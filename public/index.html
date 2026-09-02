@@ -1,17 +1,39 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cat Box Reminder</title></head>
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cat Box Reminder</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:40px auto;padding:0 18px;line-height:1.5;color:#222}.card{border:1px solid #ddd;border-radius:10px;padding:18px;margin:18px 0}.muted{color:#666}.status-grid{display:grid;gap:8px}.status-row{display:flex;justify-content:space-between;gap:18px;border-bottom:1px solid #eee;padding:8px 0}.status-row:last-child{border-bottom:0}.status-label{font-weight:600}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}input,button{font:inherit;padding:11px 12px}input{width:100%;box-sizing:border-box;margin:6px 0 10px}button{cursor:pointer;border:1px solid #bbb;border-radius:7px;background:#f7f7f7}button.primary{font-weight:700;background:#222;color:#fff;border-color:#222}.success{color:#176b2c;font-weight:600}.error{color:#9b1c1c}.link-card a{font-weight:600;color:inherit}@media(max-width:520px){.status-row{display:block}.status-row span:last-child{display:block;margin-top:3px}.actions button{width:100%}}
+</style>
+</head>
 <body>
 <main>
 <h1>Cat Box Reminder</h1>
-<p>Cleaning resets one shared 36-hour timer for the household.</p>
-<div id="status">Loading status…</div>
-<label for="pin">Household PIN</label>
-<input id="pin" type="password" inputmode="numeric">
-<button id="cleaned">Cat Box Cleaned Now</button>
-<p id="message"></p>
-<p><a href="/members.html">Manage household members & SMS opt-in</a></p>
-<p>Reminder texts are sent only to opted-in household members during the allowed sending window. Reply DONE, CLEANED, YES, FINISHED, or COMPLETE to reset the timer. Reply STOP to opt out.</p>
+<p>This private household app keeps one shared cat-box cleaning timer and sends SMS reminders only to household members who have opted in.</p>
+
+<div class="card">
+<h2>Current status</h2>
+<div id="status" class="muted">Loading status…</div>
+</div>
+
+<div class="card">
+<h2>Mark the cat box cleaned</h2>
+<p class="muted">This resets the shared timer for everyone.</p>
+<label for="pin"><strong>Household PIN</strong></label>
+<input id="pin" type="password" inputmode="numeric" autocomplete="current-password">
+<div class="actions"><button id="cleaned" class="primary">Cat Box Cleaned Now</button></div>
+<p id="message" aria-live="polite"></p>
+</div>
+
+<div class="card link-card">
+<h2>Household members</h2>
+<p>Add members, send opt-in invitations, and check who has consented to SMS reminders.</p>
+<p><a href="/members.html">Manage household members & SMS opt-in →</a></p>
+</div>
+
+<h2>How reminders work</h2>
+<p>Reminder texts are sent only to opted-in household members during the allowed sending window. Reply <strong>DONE</strong>, <strong>CLEANED</strong>, <strong>YES</strong>, <strong>FINISHED</strong>, or <strong>COMPLETE</strong> to reset the timer. Reply <strong>STOP</strong> to opt out.</p>
 </main>
 <script>
 const statusEl=document.getElementById('status');
@@ -19,9 +41,9 @@ const messageEl=document.getElementById('message');
 const pinEl=document.getElementById('pin');
 const button=document.getElementById('cleaned');
 function fmt(v){return v?new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(new Date(v)):'Not set'}
-async function loadStatus(){const r=await fetch('/api/status');const s=await r.json();statusEl.innerHTML=`<strong>Last cleaned:</strong> ${fmt(s.last_cleaned_at)}<br><strong>Next due:</strong> ${fmt(s.next_due_at)}<br><strong>Waiting for reply:</strong> ${s.waiting_for_reply?'Yes':'No'}`}
-button.addEventListener('click',async()=>{button.disabled=true;messageEl.textContent='';const r=await fetch('/api/cleaned-now',{method:'POST',headers:{'x-household-pin':pinEl.value}});const data=await r.json().catch(()=>({}));if(!r.ok)messageEl.textContent=data.error||'Could not reset timer.';else{messageEl.textContent='Timer reset for 36 hours.';await loadStatus()}button.disabled=false});
-loadStatus().catch(()=>{statusEl.textContent='Status unavailable.'});
+async function loadStatus(){const r=await fetch('/api/status');const s=await r.json();statusEl.className='status-grid';statusEl.innerHTML=`<div class="status-row"><span class="status-label">Last cleaned</span><span>${fmt(s.last_cleaned_at)}</span></div><div class="status-row"><span class="status-label">Next due</span><span>${fmt(s.next_due_at)}</span></div><div class="status-row"><span class="status-label">Waiting for reply</span><span>${s.waiting_for_reply?'Yes':'No'}</span></div>`}
+button.addEventListener('click',async()=>{button.disabled=true;messageEl.textContent='';messageEl.className='';const r=await fetch('/api/cleaned-now',{method:'POST',headers:{'x-household-pin':pinEl.value}});const data=await r.json().catch(()=>({}));if(!r.ok){messageEl.className='error';messageEl.textContent=data.error||'Could not reset timer.'}else{messageEl.className='success';messageEl.textContent=`Timer reset. Next reminder is due ${fmt(data.nextDueAt)}.`;await loadStatus()}button.disabled=false});
+loadStatus().catch(()=>{statusEl.className='error';statusEl.textContent='Status unavailable.'});
 </script>
 </body>
 </html>
