@@ -34,6 +34,7 @@ Adding another user later uses the same process; phone numbers are no longer har
 - Cleaning confirmation words reset the shared timer successfully.
 - The scheduled reminder function reaches Twilio's Messaging API.
 - Earlier trial-account and Toll-Free Verification blockers (`21608` and `30032`) were identified during controlled tests.
+- A household-member phone mismatch that triggered trial error `21608` was corrected with database migration `003_correct_joe_phone`.
 - Toll-Free Verification was approved on 2026-09-01.
 - Production timing is 36 hours with a 15-minute scheduler.
 - A fresh end-to-end outbound test should be run after household members complete the new web opt-in flow.
