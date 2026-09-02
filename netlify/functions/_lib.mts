@@ -2,7 +2,7 @@ import { getDatabase } from "@netlify/database";
 import twilio from "twilio";
 
 export const PACIFIC_TZ = "America/Los_Angeles";
-export const REMINDER_HOURS = 36;
+export const REMINDER_HOURS = 2 / 60;
 
 export function db() {
   return getDatabase();
