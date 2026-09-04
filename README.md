@@ -10,6 +10,7 @@ A Netlify + Twilio household reminder app. One shared cat-box timer is reset whe
 - Reminder sending is limited to 8:00 AM through 8:45 PM America/Los_Angeles time. Nothing is sent from 9:00 PM through 7:59 AM.
 - If nobody confirms cleaning after the first reminder, the escalation schedule is 5:00 PM, 6:00 PM, 7:00 PM, 8:00 PM, 8:15 PM, 8:30 PM, and 8:45 PM, followed by 8:00 AM the next morning and another evening cycle if still unconfirmed.
 - Any valid cleaning confirmation from an active household member records the cleaning, stops escalation, and starts a fresh shared 36-hour timer.
+- Pressing **Cat Box Cleaned Now** also sends each active opted-in household member a confirmation text showing the next 36-hour check-in time in Pacific time.
 - Replying `STOP` deactivates that household member in the app. `HELP` remains available through Twilio's messaging flow.
 - The **Cat Box Cleaned Now** web button resets the shared timer and is protected by `HOUSEHOLD_PIN`.
 - Twilio webhook signatures are validated against the public inbound webhook URL.
