@@ -1,5 +1,17 @@
 import type { Config, Context } from "@netlify/functions";
-import { addHours, db, json, REMINDER_HOURS } from "./_lib.mts";
+import { activeRecipients, addHours, db, json, PACIFIC_TZ, REMINDER_HOURS, twilioClient, twilioNumber } from "./_lib.mts";
+
+function formatPacific(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: PACIFIC_TZ,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short"
+  }).format(date);
+}
 
 export default async (req: Request, _context: Context) => {
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
@@ -29,6 +41,24 @@ export default async (req: Request, _context: Context) => {
     INSERT INTO cleaning_events (cleaned_at, confirmed_by, source)
     VALUES (${now}, ${"button"}, ${"web"})
   `;
+
+  try {
+    const recipients = await activeRecipients();
+    if (recipients.length > 0) {
+      const client = twilioClient();
+      const from = twilioNumber();
+      const body = `Cat box done. Next check-in: ${formatPacific(nextDue)}.`;
+      const results = await Promise.allSettled(
+        recipients.map((to) => client.messages.create({ from, to, body }))
+      );
+      const failed = results.filter((result) => result.status === "rejected");
+      if (failed.length > 0) {
+        console.error("cleaned-now: confirmation SMS failed for one or more recipients", { failed: failed.length });
+      }
+    }
+  } catch (err) {
+    console.error("cleaned-now: confirmation SMS send failed", err);
+  }
 
   return json({ ok: true, cleanedAt: now.toISOString(), nextDueAt: nextDue.toISOString() });
 };
