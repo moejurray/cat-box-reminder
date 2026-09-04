@@ -3,13 +3,29 @@ import twilio from "twilio";
 import {
   acceptedConfirmation,
   activeMemberForPhone,
+  activeRecipients,
   addHours,
   db,
   normalizePhone,
-  REMINDER_HOURS
+  PACIFIC_TZ,
+  REMINDER_HOURS,
+  twilioClient,
+  twilioNumber
 } from "./_lib.mts";
 
 const PUBLIC_WEBHOOK_URL = "https://cat-box-reminder.netlify.app/sms/incoming";
+
+function formatPacific(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: PACIFIC_TZ,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short"
+  }).format(date);
+}
 
 export default async (req: Request) => {
   try {
@@ -75,6 +91,21 @@ export default async (req: Request) => {
     `;
 
     console.log("incoming-sms: timer reset", { who: member.name });
+
+    try {
+      const recipients = await activeRecipients();
+      const client = twilioClient();
+      const fromNumber = twilioNumber();
+      const message = `Cat box done. Next check-in: ${formatPacific(nextDue)}.`;
+
+      for (const to of recipients) {
+        await client.messages.create({ from: fromNumber, to, body: message });
+      }
+      console.log("incoming-sms: confirmation broadcast sent", { recipients: recipients.length });
+    } catch (sendError) {
+      console.error("incoming-sms: confirmation broadcast failed", sendError);
+    }
+
     return new Response(null, { status: 204 });
   } catch (error) {
     console.error("incoming-sms: unhandled error", error);
