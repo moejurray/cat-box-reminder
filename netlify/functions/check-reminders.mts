@@ -82,15 +82,21 @@ export default async () => {
 
   const database = db();
   const rows = await database.sql`
-    SELECT next_due_at, waiting_for_reply
+    SELECT next_due_at, next_reminder_at, waiting_for_reply
     FROM cat_box_state
     WHERE id = 1
   `;
-  const state = rows[0] as { next_due_at?: Date | string | null; waiting_for_reply?: boolean } | undefined;
+  const state = rows[0] as {
+    next_due_at?: Date | string | null;
+    next_reminder_at?: Date | string | null;
+    waiting_for_reply?: boolean;
+  } | undefined;
   if (!state?.next_due_at || state.waiting_for_reply) return;
 
   const due = new Date(state.next_due_at);
-  if (due.getTime() > now.getTime()) return;
+  const reminder = state.next_reminder_at ? new Date(state.next_reminder_at) : due;
+  const effectiveReminderAt = reminder.getTime() > due.getTime() ? reminder : due;
+  if (effectiveReminderAt.getTime() > now.getTime()) return;
 
   const people = await activeRecipients();
   if (people.length === 0) {
@@ -105,7 +111,7 @@ export default async () => {
         updated_at = NOW()
     WHERE id = 1
       AND waiting_for_reply = FALSE
-      AND next_due_at <= ${now}
+      AND GREATEST(next_due_at, COALESCE(next_reminder_at, next_due_at)) <= ${now}
     RETURNING id
   `;
   if (claimed.length === 0) return;
@@ -130,7 +136,7 @@ export default async () => {
     await database.sql`
       UPDATE cat_box_state
       SET waiting_for_reply = FALSE,
-          next_due_at = ${nextReminderAt},
+          next_reminder_at = ${nextReminderAt},
           updated_at = NOW()
       WHERE id = 1
     `;
@@ -140,7 +146,7 @@ export default async () => {
     await database.sql`
       UPDATE cat_box_state
       SET waiting_for_reply = FALSE,
-          next_due_at = ${retryAt},
+          next_reminder_at = ${retryAt},
           updated_at = NOW()
       WHERE id = 1
     `;
