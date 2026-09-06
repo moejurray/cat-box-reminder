@@ -30,6 +30,7 @@ export default async (req: Request, _context: Context) => {
     UPDATE cat_box_state
     SET last_cleaned_at = ${now},
         next_due_at = ${nextDue},
+        next_reminder_at = NULL,
         waiting_for_reply = FALSE,
         last_reminder_at = NULL,
         last_confirmed_by = 'button',
@@ -47,7 +48,7 @@ export default async (req: Request, _context: Context) => {
     if (recipients.length > 0) {
       const client = twilioClient();
       const from = twilioNumber();
-      const body = `Cat box done. Next check-in: ${formatPacific(nextDue)}.`;
+      const body = `Cat box done. Due: ${formatPacific(nextDue)}.`;
       const results = await Promise.allSettled(
         recipients.map((to) => client.messages.create({ from, to, body }))
       );
