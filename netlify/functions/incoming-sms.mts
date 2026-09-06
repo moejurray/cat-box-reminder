@@ -79,7 +79,9 @@ export default async (req: Request) => {
       UPDATE cat_box_state
       SET last_cleaned_at = ${now},
           next_due_at = ${nextDue},
+          next_reminder_at = NULL,
           waiting_for_reply = FALSE,
+          last_reminder_at = NULL,
           last_confirmed_by = ${member.name},
           updated_at = NOW()
       WHERE id = 1
@@ -96,7 +98,7 @@ export default async (req: Request) => {
       const recipients = await activeRecipients();
       const client = twilioClient();
       const fromNumber = twilioNumber();
-      const message = `Cat box done. Next check-in: ${formatPacific(nextDue)}.`;
+      const message = `Cat box done. Due: ${formatPacific(nextDue)}.`;
 
       for (const to of recipients) {
         await client.messages.create({ from: fromNumber, to, body: message });
