@@ -1,2 +1,0 @@
-ALTER TABLE cat_box_state
-ADD COLUMN IF NOT EXISTS next_reminder_at TIMESTAMPTZ;
