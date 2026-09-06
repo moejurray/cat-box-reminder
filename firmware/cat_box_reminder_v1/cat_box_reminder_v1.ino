@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
+#include <WebServer.h>
 
 unsigned long lastStatusCheck = 0;
 const unsigned long STATUS_INTERVAL = 60UL * 60UL * 1000UL;  // 1 hour
@@ -12,7 +13,15 @@ const int GREEN_LED = 27;
 const int BUZZER_PIN = 32;
 const int BUTTON_PIN = 33;
 
-const long YELLOW_THRESHOLD = 5 * 60 * 60;
+WebServer server(80);
+
+String currentStatus = "UNKNOWN";
+int lastStatusHttpCode = 0;
+long lastSecondsUntilDue = 0;
+unsigned long lastSuccessfulStatusCheck = 0;
+String lastButtonResult = "NONE";
+
+const long YELLOW_THRESHOLD = 5 * 60 * 60;  // 5 hours
 
 bool lastButtonState = HIGH;
 
@@ -26,18 +35,22 @@ void updateStatus() {
   client.setInsecure();
 
   HTTPClient https;
-  https.setTimeout(20000);  // 20 seconds
-
+  https.setTimeout(20000);
 
   if (!https.begin(
         client,
         "https://cat-box-reminder.netlify.app/api/status")) {
 
     Serial.println("Could not connect to status API");
+
+    lastStatusHttpCode = -1;
+    currentStatus = "API ERROR";
+
     return;
   }
 
   int httpCode = https.GET();
+  lastStatusHttpCode = httpCode;
 
   Serial.print("Status HTTP code: ");
   Serial.println(httpCode);
@@ -65,15 +78,19 @@ void updateStatus() {
       long secondsUntilDue =
         response.substring(start, end).toInt();
 
+      lastSecondsUntilDue = secondsUntilDue;
+      lastSuccessfulStatusCheck = millis();
+
       Serial.print("Seconds until due: ");
       Serial.println(secondsUntilDue);
-
 
       if (secondsUntilDue <= 0) {
 
         digitalWrite(RED_LED, HIGH);
         digitalWrite(YELLOW_LED, LOW);
         digitalWrite(GREEN_LED, LOW);
+
+        currentStatus = "RED - NOW DUE";
 
         Serial.println("STATUS: RED");
         Serial.println("NOW DUE");
@@ -84,6 +101,8 @@ void updateStatus() {
         digitalWrite(YELLOW_LED, HIGH);
         digitalWrite(GREEN_LED, LOW);
 
+        currentStatus = "YELLOW";
+
         Serial.println("STATUS: YELLOW");
 
       } else {
@@ -92,9 +111,20 @@ void updateStatus() {
         digitalWrite(YELLOW_LED, LOW);
         digitalWrite(GREEN_LED, HIGH);
 
+        currentStatus = "GREEN";
+
         Serial.println("STATUS: GREEN");
       }
+
+    } else {
+
+      currentStatus = "PARSE ERROR";
+      Serial.println("Could not find seconds_until_due");
     }
+
+  } else {
+
+    currentStatus = "API ERROR";
   }
 
   https.end();
@@ -110,16 +140,21 @@ void markCleaned() {
   Serial.println("BUTTON PRESSED");
   Serial.println("Sending CLEANED request...");
 
+  lastButtonResult = "SENDING";
+
   WiFiClientSecure client;
   client.setInsecure();
 
   HTTPClient https;
+  https.setTimeout(20000);
 
   if (!https.begin(
         client,
         "https://cat-box-reminder.netlify.app/api/cleaned-now")) {
 
     Serial.println("Could not connect to cleaned-now API");
+
+    lastButtonResult = "CONNECTION FAILED";
     return;
   }
 
@@ -138,10 +173,11 @@ void markCleaned() {
 
   https.end();
 
-
   if (httpCode >= 200 && httpCode < 300) {
 
     Serial.println("CLEANING CONFIRMED");
+
+    lastButtonResult = "SUCCESS";
 
     tone(BUZZER_PIN, 900);
     delay(120);
@@ -161,10 +197,73 @@ void markCleaned() {
   } else {
 
     Serial.println("CLEANING FAILED");
+
+    lastButtonResult = "FAILED HTTP " + String(httpCode);
   }
 }
 
 
+// --------------------------------
+// Local diagnostics web page
+// --------------------------------
+void handleDiagnostics() {
+
+  String page;
+
+  page += "<!DOCTYPE html>";
+  page += "<html><head>";
+  page += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  page += "<meta http-equiv='refresh' content='10'>";
+  page += "<title>Right Meow Status</title>";
+  page += "</head><body>";
+
+  page += "<h1>Right Meow Cat Box Reminder</h1>";
+
+  page += "<p><strong>Wi-Fi:</strong> ";
+  page += (WiFi.status() == WL_CONNECTED ? "CONNECTED" : "DISCONNECTED");
+  page += "</p>";
+
+  page += "<p><strong>IP address:</strong> ";
+  page += WiFi.localIP().toString();
+  page += "</p>";
+
+  page += "<p><strong>Status:</strong> ";
+  page += currentStatus;
+  page += "</p>";
+
+  page += "<p><strong>Last HTTP code:</strong> ";
+  page += String(lastStatusHttpCode);
+  page += "</p>";
+
+  page += "<p><strong>Seconds until due:</strong> ";
+  page += String(lastSecondsUntilDue);
+  page += "</p>";
+
+  page += "<p><strong>Hours until due:</strong> ";
+  page += String(lastSecondsUntilDue / 3600.0, 1);
+  page += "</p>";
+
+  page += "<p><strong>Last button result:</strong> ";
+  page += lastButtonResult;
+  page += "</p>";
+
+  page += "<p><strong>Last successful status check:</strong> ";
+  page += String(lastSuccessfulStatusCheck / 1000);
+  page += " seconds after boot</p>";
+
+  page += "<p><strong>Uptime:</strong> ";
+  page += String(millis() / 1000);
+  page += " seconds</p>";
+
+  page += "</body></html>";
+
+  server.send(200, "text/html", page);
+}
+
+
+// --------------------------------
+// Setup
+// --------------------------------
 void setup() {
 
   Serial.begin(115200);
@@ -192,11 +291,24 @@ void setup() {
   Serial.println();
   Serial.println("Wi-Fi connected");
 
+  server.on("/", handleDiagnostics);
+  server.begin();
+
+  Serial.print("Diagnostics page: http://");
+  Serial.println(WiFi.localIP());
+
   updateStatus();
+
+  lastStatusCheck = millis();
 }
 
 
+// --------------------------------
+// Main loop
+// --------------------------------
 void loop() {
+
+  server.handleClient();
 
   bool buttonState = digitalRead(BUTTON_PIN);
 
@@ -213,7 +325,7 @@ void loop() {
 
   lastButtonState = buttonState;
 
-  // Automatic status refresh every 60 seconds
+  // Automatic status refresh every hour
   if (millis() - lastStatusCheck >= STATUS_INTERVAL) {
 
     Serial.println();
@@ -224,5 +336,5 @@ void loop() {
     lastStatusCheck = millis();
   }
 
-  delay(20);
+  delay(1);
 }
