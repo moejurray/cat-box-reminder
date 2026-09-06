@@ -98,7 +98,7 @@ export default async (req: Request) => {
       const recipients = await activeRecipients();
       const client = twilioClient();
       const fromNumber = twilioNumber();
-      const message = `Cat box done. Due: ${formatPacific(nextDue)}.`;
+      const message = `${member.name} cleaned the cat box. Due: ${formatPacific(nextDue)}.`;
 
       for (const to of recipients) {
         await client.messages.create({ from: fromNumber, to, body: message });
