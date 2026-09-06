@@ -1,8 +1,8 @@
 # Cat Box Reminder
 
-A Netlify + Twilio household reminder system with one shared cat-box timer, SMS notifications, a small web app, and an ESP32-based physical reminder device in development.
+A Netlify + Twilio household reminder system with one shared cat-box timer, SMS notifications, a small web app, and an ESP32-based physical reminder device.
 
-The shared timer is reset whenever someone presses **Cat Box Cleaned Now** in the web app, an opted-in household member replies with a valid confirmation word, or the future ESP32 hardware button calls the same reset endpoint.
+The shared timer is reset whenever someone presses **Cat Box Cleaned Now** in the web app, an opted-in household member replies with a valid confirmation word, or the ESP32 hardware button calls the same reset endpoint.
 
 ## Current behavior
 
@@ -22,7 +22,7 @@ The shared timer is reset whenever someone presses **Cat Box Cleaned Now** in th
 
 ## Due time vs. reminder time
 
-The system now deliberately keeps the true cleaning deadline separate from reminder scheduling.
+The system deliberately keeps the true cleaning deadline separate from reminder scheduling.
 
 - `next_due_at` = the actual 36-hour deadline after the last cleaning.
 - `next_reminder_at` = the next time the reminder system should attempt an SMS escalation.
@@ -60,7 +60,7 @@ The web UI shows **NOW DUE** after the true deadline instead of displaying a fut
 
 ## Cleaning/reset endpoint
 
-The web button and future ESP32 hardware button use:
+The web button and ESP32 hardware button use:
 
 `POST /api/cleaned-now`
 
@@ -77,7 +77,7 @@ A successful reset:
 
 ## ESP32 physical reminder device
 
-The physical device is being built around a **30-pin ESP32 DEVKITV1** board with a CP2102 USB-to-UART interface.
+The physical device is built around a **30-pin ESP32 DEVKITV1** board with a CP2102 USB-to-UART interface.
 
 ### Development setup verified
 
@@ -88,47 +88,76 @@ The physical device is being built around a **30-pin ESP32 DEVKITV1** board with
 - USB serial port currently observed as `COM3`
 - CP210x Windows VCP driver installed
 - ArduinoJson library installed
-- Onboard GPIO 2 LED blink test passed
 - Serial Monitor tested at `115200` baud
-- Wi-Fi scan passed
-- Wi-Fi connection passed
+- Wi-Fi connection verified
 - HTTPS request to the live Netlify site returned HTTP 200
 - HTTPS request to `/api/status` returned HTTP 200 and valid JSON
-- NTP time synchronization passed
-- JSON parsing and local due-time comparison passed
+- `POST /api/cleaned-now` from the physical button returned HTTP 200
+- Physical LEDs, pushbutton, and piezo buzzer all verified on the breadboard
 
-Development Wi-Fi SSID currently used in the test sketch: `BetterStill`.
+### Verified GPIO assignments
 
-**Do not commit the Wi-Fi password or household PIN into the repository.**
+- Red LED: GPIO 25
+- Yellow LED: GPIO 26
+- Green LED: GPIO 27
+- Piezo buzzer: GPIO 32
+- Pushbutton: GPIO 33
+- LEDs and buzzer use the breadboard common ground rail
 
-### Planned hardware
+Each LED uses its own current-limiting resistor.
 
-- green standard LED
-- yellow standard LED
-- red standard LED
-- one current-limiting resistor per LED, typically 220–330 ohms
-- pushbutton
-- piezo buzzer
-- breadboard during prototyping
-- jumper wires
+### Device behavior
 
-Planned first external LED test uses GPIO 25 for the red LED. Final GPIO assignments should be documented here after the complete breadboard circuit is validated.
+The ESP32 reads the shared Netlify status and drives the LEDs from `seconds_until_due`.
 
-### Planned device behavior
+Current status logic:
 
-The ESP32 will periodically read `/api/status` over Wi-Fi and translate the true due time into a local physical status.
-
-Current prototype logic:
-
-- more than 6 hours remaining: **GREEN**
-- 0 to 6 hours remaining: **YELLOW**
+- more than 5 hours remaining: **GREEN**
+- 0 to 5 hours remaining: **YELLOW**
 - due or overdue: **RED / NOW DUE**
 
-The 6-hour yellow threshold is provisional and can be adjusted after real-world use.
+The device checks `/api/status`:
 
-The current test firmware refreshes state approximately once per minute. The prototype presently uses an ESP32 restart between checks; this is intentionally simple for bring-up and should later be replaced with a normal polling loop.
+- immediately at startup
+- once per hour during normal operation
+- immediately after a successful physical-button reset
 
-The future pushbutton will call `/api/cleaned-now` so the Netlify app remains the single source of truth. The device should only show success after the server confirms the reset. The piezo buzzer will provide status/confirmation tones after the basic LED and button behavior is proven.
+The physical button calls:
+
+`POST /api/cleaned-now`
+
+The request includes the household PIN in the `x-household-pin` header. The device only signals success after the server returns a successful HTTP response.
+
+A successful physical reset:
+
+- records the cleaning in the shared Netlify app
+- starts a fresh 36-hour timer
+- updates the shared status
+- sends the configured household confirmation SMS
+- sounds a short piezo confirmation chirp
+- refreshes the LEDs immediately
+
+End-to-end physical testing confirmed that a button press resets the shared timer and the returned status shows `last_confirmed_by` as `button`.
+
+### Firmware
+
+Current breadboard firmware:
+
+`firmware/cat_box_reminder_v1/cat_box_reminder_v1.ino`
+
+Firmware secrets are kept outside the committed sketch in:
+
+`secrets.h`
+
+That file is excluded from Git with `.gitignore`.
+
+Use:
+
+`secrets.example.h`
+
+as the template for local configuration.
+
+**Do not commit the real Wi-Fi password or household PIN.**
 
 ## Household member and consent flow
 
@@ -163,9 +192,13 @@ The following words reset the shared timer when sent by an active opted-in house
 - Toll-Free Verification was approved on 2026-09-01.
 - End-to-end outbound testing succeeded on 2026-09-02: all three opted-in household members received the reminder SMS, and a cleaning confirmation was sent afterward.
 - Production timing is a 36-hour timer with a 15-minute reminder scheduler.
-- True due time and reminder/escalation timing are now stored separately.
+- True due time and reminder/escalation timing are stored separately.
 - Production database migrations for that separation were successfully applied on 2026-09-06.
-- ESP32 successfully reads live production status and correctly reports an overdue state as `RED` / `NOW DUE`.
+- ESP32 successfully reads live production status and correctly reports overdue state as `RED` / `NOW DUE`.
+- ESP32 red, yellow, and green LED states were individually tested.
+- ESP32 physical pushbutton successfully reset the live shared timer through `/api/cleaned-now`.
+- Successful physical reset returned HTTP 200, produced a confirmation chirp, refreshed status immediately, and returned `last_confirmed_by: "button"`.
+- ESP32 firmware is committed under `firmware/cat_box_reminder_v1/` with secrets excluded from Git.
 
 ## Required environment variables
 
@@ -197,12 +230,12 @@ Netlify Database is provisioned automatically and applies migrations in `netlify
 
 ## Current next step
 
-Continue physical-device bring-up on the breadboard:
+The first stable breadboard firmware is complete and committed.
 
-1. Wire and verify one external red LED on GPIO 25.
-2. Add green and yellow LEDs one at a time.
-3. Replace restart-based polling with a normal timed polling loop.
-4. Add and debounce the physical reset button.
-5. Call `/api/cleaned-now` from the button and require a successful server response before signaling completion.
-6. Add piezo status tones.
-7. Move Wi-Fi credentials and household authentication out of the main sketch before any firmware is committed publicly or shared.
+Next development tasks:
+
+1. Continue real-world testing of hourly status polling.
+2. Improve Wi-Fi/API failure handling and automatic recovery.
+3. Decide on final buzzer/status tone behavior.
+4. Choose the permanent power arrangement.
+5. Move the prototype from breadboard toward a permanent enclosure and final wiring.
