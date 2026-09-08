@@ -33,14 +33,14 @@ export default async (req: Request, _context: Context) => {
         next_reminder_at = NULL,
         waiting_for_reply = FALSE,
         last_reminder_at = NULL,
-        last_confirmed_by = 'button',
+        last_confirmed_by = 'Button Press',
         updated_at = NOW()
     WHERE id = 1
   `;
 
   await database.sql`
     INSERT INTO cleaning_events (cleaned_at, confirmed_by, source)
-    VALUES (${now}, ${"button"}, ${"web"})
+    VALUES (${now}, ${"Button Press"}, ${"web"})
   `;
 
   try {
@@ -48,7 +48,7 @@ export default async (req: Request, _context: Context) => {
     if (recipients.length > 0) {
       const client = twilioClient();
       const from = twilioNumber();
-      const body = `Cat box done. Due: ${formatPacific(nextDue)}.`;
+      const body = `Button Press cleaned the cat box. Due: ${formatPacific(nextDue)}.`;
       const results = await Promise.allSettled(
         recipients.map((to) => client.messages.create({ from, to, body }))
       );
