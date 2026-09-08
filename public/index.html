@@ -44,7 +44,7 @@ const statusEl=document.getElementById('status');
 const messageEl=document.getElementById('message');
 const pinEl=document.getElementById('pin');
 const button=document.getElementById('cleaned');
-function fmt(v){return v?new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(new Date(v)):'Not set'}
+function fmt(v){return v?new Intl.DateTimeFormat(undefined,{weekday:'long',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(v)):'Not set'}
 function dueDisplay(s){return s.is_due?'<span class="due">NOW DUE</span>':fmt(s.next_due_at)}
 async function loadStatus(){const r=await fetch('/api/status',{cache:'no-store'});const s=await r.json();statusEl.className='status-grid';statusEl.innerHTML=`<div class="status-row"><span class="status-label">Last cleaned</span><span>${fmt(s.last_cleaned_at)}</span></div><div class="status-row"><span class="status-label">Next due</span><span>${dueDisplay(s)}</span></div><div class="status-row"><span class="status-label">Waiting for reply</span><span>${s.waiting_for_reply?'Yes':'No'}</span></div>`}
 button.addEventListener('click',async()=>{button.disabled=true;messageEl.textContent='';messageEl.className='';const r=await fetch('/api/cleaned-now',{method:'POST',headers:{'x-household-pin':pinEl.value}});const data=await r.json().catch(()=>({}));if(!r.ok){messageEl.className='error';messageEl.textContent=data.error||'Could not reset timer.'}else{messageEl.className='success';messageEl.textContent=`Timer reset. Cat box due ${fmt(data.nextDueAt)}.`;await loadStatus()}button.disabled=false});
