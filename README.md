@@ -87,12 +87,12 @@ The physical device is built around a **30-pin ESP32 DEVKITV1** board with a CP2
 
 ### Verified GPIO assignments
 
-- Red LED: GPIO 25
+- Red LED: GPIO 33
 - Yellow LED: GPIO 26
 - Green LED: GPIO 27
-- Piezo buzzer: GPIO 32
-- Pushbutton: GPIO 33
-- LEDs and buzzer use the breadboard common ground rail
+- Piezo buzzer: GPIO 18
+- Pushbutton: GPIO 21
+- LEDs, buzzer, and button use a common ground bus
 
 Each LED uses its own current-limiting resistor.
 
@@ -102,8 +102,8 @@ The ESP32 reads the shared Netlify status and drives the LEDs from `seconds_unti
 
 Current status logic for the 48-hour cycle:
 
-- **More than 12 hours remaining:** GREEN
-- **0 to 12 hours remaining:** YELLOW — corresponds to the 36-to-48-hour portion of the cleaning cycle
+- **More than 5 hours remaining:** GREEN
+- **0 to 5 hours remaining:** YELLOW
 - **Due or overdue:** RED / NOW DUE
 
 The device checks `/api/status` immediately at startup, once per hour during normal operation, and immediately after a successful physical-button reset.
@@ -116,13 +116,13 @@ A successful physical reset records the cleaning in the shared Netlify app, star
 
 Current firmware:
 
-`firmware/cat_box_reminder_v1/cat_box_reminder_v1.ino`
+`firmware/cat_box_reminder/cat_box_reminder.ino`
 
 The current firmware uses:
 
-`YELLOW_THRESHOLD = 12 * 60 * 60`
+`YELLOW_THRESHOLD = 5 * 60 * 60`
 
-so the yellow LED begins when 12 hours remain before the 48-hour due point.
+so the yellow LED begins when 5 hours remain before the 48-hour due point.
 
 Firmware secrets are kept outside the committed sketch in `secrets.h`. That file is excluded from Git with `.gitignore`. Use `secrets.example.h` as the template for local configuration.
 
@@ -160,9 +160,9 @@ The following words reset the shared timer when sent by an active opted-in house
 - ESP32 successfully reads live production status.
 - ESP32 red, yellow, and green LED states were individually tested.
 - ESP32 physical pushbutton successfully resets the live shared timer through `/api/cleaned-now`.
-- ESP32 firmware is committed under `firmware/cat_box_reminder_v1/` with secrets excluded from Git.
+- ESP32 firmware is committed under `firmware/cat_box_reminder/` with secrets excluded from Git.
 - Current production timing is **36-hour advance nudge / 48-hour true due time**.
-- Current ESP32 LED timing is **green until 12 hours remain, yellow for the final 12 hours, and red when due/overdue**.
+- Current ESP32 LED timing is **green until 5 hours remain, yellow for the final 5 hours, and red when due/overdue**.
 
 ## Required environment variables
 
