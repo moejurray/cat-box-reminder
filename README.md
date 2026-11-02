@@ -7,20 +7,23 @@ The shared timer is reset whenever someone presses **Cat Box Cleaned Now** in th
 ## Current behavior
 
 - Cleaning starts a shared **48-hour due timer**.
-- At **36 hours after cleaning**, the system sends a one-time advance nudge SMS to all active opted-in household members.
-- The cat box becomes actually **due at 48 hours** after cleaning.
-- A scheduled Netlify Function checks reminder state every 15 minutes.
-- Reminder SMS messages are sent only to household members whose consent has been recorded in the database and whose status is active.
-- Reminder sending is limited to 8:00 AM through 8:45 PM America/Los_Angeles time. Nothing is sent from 9:00 PM through 7:59 AM.
-- If the 36-hour nudge or 48-hour deadline occurs during quiet hours, SMS sending is deferred until the next allowed reminder time. Quiet hours do not move the true 48-hour due date.
-- Once due, if nobody confirms cleaning after the first reminder, the escalation schedule is 5:00 PM, 6:00 PM, 7:00 PM, 8:00 PM, 8:15 PM, 8:30 PM, and 8:45 PM, followed by 8:00 AM the next morning and another evening cycle if still unconfirmed.
+- The 36-hour advance nudge has been removed entirely.
+- The cat box becomes actually **due at 48 hours** after cleaning; due status remains independent of SMS scheduling.
+- A scheduled Netlify Function checks reminder state every 15 minutes but sends SMS only in the fixed Pacific time slots.
+- Reminder SMS messages go only to active, opted-in household members.
+- At **9:00 PM the calendar night before the due date**, a single advance reminder goes out.
+- On the due date, reminders occur at **7:45 AM, 8:15 AM, and 9:00 AM**.
+- If cleaning has not been confirmed, additional reminders go out at **6:00 PM, 7:00 PM, and 8:00 PM**.
+- If still unfinished on subsequent days, the same morning/evening slots repeat; the 9:00 PM advance reminder does not repeat.
+- Fixed slots are at least 30 minutes apart, with no more than two scheduled reminders in any rolling hour. Missed slots are not sent late.
+- All reminder times are America/Los_Angeles wall-clock time, including daylight saving changes.
 - Any valid cleaning confirmation from an active household member records the cleaning, stops escalation, clears the reminder schedule, and starts a fresh shared 48-hour timer.
 - Pressing **Cat Box Cleaned Now** sends each active opted-in household member a confirmation text showing the next true due time in Pacific time.
 - Texting a valid cleaning confirmation word also sends that same confirmation text to each active opted-in household member.
 - Replying `STOP` deactivates that household member in the app. `HELP` remains available through Twilio's messaging flow.
 - The **Cat Box Cleaned Now** web button is protected by `HOUSEHOLD_PIN`.
 - Twilio webhook signatures are validated against the public inbound webhook URL.
-- If an outbound reminder attempt fails for a normal transient reason, the app backs off for one hour. Twilio error `63038` triggers a 24-hour backoff.
+- Failed scheduled sends are logged, but do not create off-schedule retry bursts. The next eligible attempt is at a future fixed reminder slot.
 
 ## Due time vs. reminder time
 
@@ -32,9 +35,7 @@ The system deliberately keeps the true cleaning deadline separate from reminder 
 - `last_reminder_at` = the most recent reminder-send time.
 - `waiting_for_reply` = reminder workflow state.
 
-The 36-hour advance nudge is an early opportunity to clean the box; it does **not** mean the box is overdue. The true due point remains 48 hours after the last cleaning.
-
-Quiet hours must never move the actual due date. If the 48-hour timer expires during quiet hours, the box is already overdue even though the next permitted SMS may not be sent until 8:00 AM.
+The advance nudge has been removed. The night-before 9:00 PM SMS is tied to the local calendar date of the due deadline, not to an elapsed-hour threshold. The physical device and app continue to use the unchanged true 48-hour due timestamp.
 
 Database migrations `004_separate_due_and_reminder` and `005_restore_true_due_time` originally introduced separation between the due deadline and reminder scheduling.
 
@@ -161,7 +162,7 @@ The following words reset the shared timer when sent by an active opted-in house
 - ESP32 red, yellow, and green LED states were individually tested.
 - ESP32 physical pushbutton successfully resets the live shared timer through `/api/cleaned-now`.
 - ESP32 firmware is committed under `firmware/cat_box_reminder/` with secrets excluded from Git.
-- Current production timing is **36-hour advance nudge / 48-hour true due time**.
+- Reminder scheduling v1.1.0: night-before 9:00 PM; due-day 7:45 AM, 8:15 AM, 9:00 AM, then 6:00 PM, 7:00 PM, 8:00 PM while unfinished. The true deadline remains 48 hours.
 - Current ESP32 LED timing is **green until 5 hours remain, yellow for the final 5 hours, and red when due/overdue**.
 
 ## Required environment variables
@@ -194,4 +195,4 @@ Netlify Database is provisioned automatically and applies migrations in `netlify
 
 ## Current next step
 
-Continue real-world testing of the new **36-hour nudge / 48-hour due** cycle and verify that SMS timing and ESP32 LED transitions remain synchronized.
+Verify the fixed-time reminder delivery and confirmation cancellation in production; ESP32 timing remains based on the unchanged 48-hour due timestamp.
